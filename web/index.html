@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crowd Detection | AI Powered</title>
+    <!-- updated path -->
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="overlay"></div>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-users-viewfinder"></i>
+                <h1>Crowd<span>Sense</span></h1>
+            </div>
+            <div class="stat-item">
+                <h3>Density</h3>
+                <p id="density-value" class="value">Low</p>
+            </div>
+            <div class="stat-item">
+                <button id="edit-tripwire-btn" class="secondary-btn"
+                    style="padding: 5px; font-size: 0.8rem; background: rgba(0,0,0,0.3); margin-right: 5px;">
+                    <i class="fa-solid fa-pen-to-square"></i> Edit Line
+                </button>
+                <button id="export-btn" class="secondary-btn"
+                    style="padding: 5px; font-size: 0.8rem; background: rgba(0,255,100,0.2); margin-right: 5px;">
+                    <i class="fa-solid fa-file-csv"></i> Export CSV
+                </button>
+                <select id="mode-select" class="secondary-btn"
+                    style="padding: 5px; font-size: 0.8rem; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);">
+                    <option value="AUTO">Auto Mode</option>
+                    <option value="INDIVIDUAL_TRACKING">Tracking (Boxes)</option>
+                    <option value="SURGE_ESTIMATION">Surge (Heatmap)</option>
+                </select>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Control Panel -->
+            <div class="glass-panel controls">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="image">
+                        <i class="fa-regular fa-image"></i> Image
+                    </button>
+                    <button class="tab-btn" data-tab="video">
+                        <i class="fa-solid fa-video"></i> Video
+                    </button>
+                    <button class="tab-btn" data-tab="webcam">
+                        <i class="fa-solid fa-camera"></i> Webcam
+                    </button>
+                </div>
+
+                <!-- Image Tab -->
+                <div id="image-tab" class="tab-content active">
+                    <div class="upload-zone" id="image-drop-zone">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <p>Drag & Drop or Click to Upload Image</p>
+                        <input type="file" id="image-input" accept="image/*" hidden>
+                    </div>
+                </div>
+
+                <!-- Video Tab -->
+                <div id="video-tab" class="tab-content">
+                    <div class="upload-zone" id="video-drop-zone">
+                        <i class="fa-solid fa-film"></i>
+                        <p>Drag & Drop or Click to Upload Video</p>
+                        <input type="file" id="video-input" accept="video/*" hidden>
+                    </div>
+                </div>
+
+                <!-- Webcam Tab -->
+                <div id="webcam-tab" class="tab-content">
+                    <p class="instruction">Use your local camera for real-time detection.</p>
+                    <button class="action-btn glow" onclick="startWebcam()">
+                        <i class="fa-solid fa-power-off"></i> Start Webcam
+                    </button>
+                </div>
+            </div>
+
+            <!-- Display Area -->
+            <div class="glass-panel display-area">
+                <div class="view-container" style="position: relative;">
+                    <img id="result-display" src="" alt="Detection Result"
+                        style="display: none; width: 100%; height: auto;">
+                    <img id="video-stream" src="" alt="Video Stream" style="display: none; width: 100%; height: auto;">
+                    <canvas id="tripwire-canvas"
+                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
+                    <div id="placeholder-view">
+                        <i class="fa-solid fa-eye-slash"></i>
+                        <p>No Active Stream</p>
+                    </div>
+                </div>
+
+                <!-- Stats Overlay -->
+                <div class="stats-panel">
+                    <div class="stat-item">
+                        <span class="label">People Count</span>
+                        <span class="value" id="count-value">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">Density</span>
+                        <span class="value" id="density-value">Low</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- updated path -->
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,74 @@
+# Live Crowd Counting System - Configuration
+
+# Model Settings
+model:
+  variant: "best.pt"  # Custom WIDER FACE model
+  confidence_threshold: 0.4  # Base threshold
+  device: "auto"  # Options: auto, cpu, cuda, 0, 1, etc.
+  iou_threshold: 0.45
+  
+  # Hybrid Mode Config
+  mode_1:
+    confidence_threshold: 0.25  # Lower threshold to find crowded faces
+    iou_threshold: 0.45
+  
+  mode_2:
+    model: "simulated_density" # Placeholder for now
+
+  hybrid:
+    enabled: true
+    switch_thresholds:
+      confidence_drop: 0.60     # Switch if avg confidence drops below 60%
+      overlap_iou: 0.3          # Switch if box overlap > 0.3 (moderate overlap)
+    recovery_threshold: 5       # Switch back if < 5 people
+
+# Input Settings
+input:
+  source: 0  # 0 for webcam, path for video file, rtsp://... for IP camera
+  resolution:
+    width: 640
+    height: 480
+  target_fps: 30
+  frame_skip: 0  # Skip every N frames (0 = process all frames)
+
+# Tracking Settings
+tracking:
+  enabled: true
+  tracker: "bytetrack.yaml"  # Built-in YOLOv8 tracker
+  max_age: 30  # Maximum frames to keep lost tracks
+  min_hits: 3  # Minimum detections before track is confirmed
+  iou_threshold: 0.3
+
+# Display Settings
+display:
+  show_boxes: true
+  show_track_ids: true
+  show_confidence: false
+  show_fps: true
+  show_count: true
+  fullscreen: false
+  window_name: "Live Crowd Counting System"
+
+# Counting Settings
+counting:
+  mode: "track_based"  # Options: frame_based, track_based
+  smoothing: true
+  smoothing_window: 5
+
+# Performance Settings
+performance:
+  batch_size: 1
+  half_precision: false  # Use FP16 for faster inference (requires GPU)
+  
+# Logging Settings
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  log_to_file: true
+  log_file: "crowd_counter.log"
+
+# Reconnection Settings (for RTSP streams)
+reconnection:
+  enabled: true
+  max_attempts: 5
+  retry_delay: 2  # seconds
+  backoff_multiplier: 1.5
