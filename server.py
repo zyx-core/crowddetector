@@ -143,7 +143,12 @@ async def video_feed():
 
 @app.get("/stats")
 async def get_stats():
-    return JSONResponse(state.latest_stats)
+    stats = state.latest_stats.copy()
+    # Add IN/OUT counts if available
+    if state.engine.counter:
+        stats["in_count"] = state.engine.counter.in_count
+        stats["out_count"] = state.engine.counter.out_count
+    return JSONResponse(stats)
 
 @app.post("/start_webcam")
 async def start_webcam():

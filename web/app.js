@@ -312,3 +312,90 @@ document.getElementById('export-btn').addEventListener('click', async () => {
 });
 
 initTripwireEditor();
+
+// --- Live Chart ---
+const chartCtx = document.getElementById('countChart').getContext('2d');
+const maxDataPoints = 60; // 60 seconds of history
+const chartData = {
+    labels: [],
+    datasets: [
+        {
+            label: 'Total Count',
+            data: [],
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.4,
+            fill: true
+        },
+        {
+            label: 'IN',
+            data: [],
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            tension: 0.4,
+            fill: false
+        },
+        {
+            label: 'OUT',
+            data: [],
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            tension: 0.4,
+            fill: false
+        }
+    ]
+};
+
+const countChart = new Chart(chartCtx, {
+    type: 'line',
+    data: chartData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                labels: { color: '#fff' }
+            }
+        },
+        scales: {
+            x: {
+                ticks: { color: '#aaa' },
+                grid: { color: 'rgba(255,255,255,0.1)' }
+            },
+            y: {
+                beginAtZero: true,
+                ticks: { color: '#aaa' },
+                grid: { color: 'rgba(255,255,255,0.1)' }
+            }
+        },
+        animation: { duration: 0 }
+    }
+});
+
+// Update chart every second
+setInterval(async () => {
+    try {
+        const res = await fetch(`${API_URL}/stats`);
+        if (res.ok) {
+            const stats = await res.json();
+            const now = new Date().toLocaleTimeString();
+
+            // Add new data point
+            chartData.labels.push(now);
+            chartData.datasets[0].data.push(stats.count || 0);
+            chartData.datasets[1].data.push(stats.in_count || 0);
+            chartData.datasets[2].data.push(stats.out_count || 0);
+
+            // Keep only last 60 points
+            if (chartData.labels.length > maxDataPoints) {
+                chartData.labels.shift();
+                chartData.datasets.forEach(ds => ds.data.shift());
+            }
+
+            countChart.update();
+        }
+    } catch (e) {
+        console.error("Chart update error:", e);
+    }
+}, 1000);
+
