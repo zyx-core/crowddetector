@@ -57,51 +57,77 @@ class HybridEngine:
 
     def process_frame(self, frame):
         """
-        Process frame and decide mode.
+        Process frame and decide mode with refined hysteresis logic.
         """
+        # Always run detection to get metrics
         detections = self.detector.detect(frame, track=True)
-        
-        avg_conf = 0
-        high_overlap_count = 0
-        
-        if len(detections) > 0:
-            avg_conf = np.mean([d['conf'] for d in detections])
-            high_overlap_count = self._count_high_overlaps(detections)
-            
-        print(f"DEBUG: Mode={self.current_mode} Count={len(detections)} AvgConf={avg_conf:.2f} Overlaps={high_overlap_count}")
-            
-        # Switch Logic
-        if self.manual_override is None:
-            if self.current_mode == self.MODE_1:
-                # Check triggers to switch to Mode 2
-                if (len(detections) > 0 and avg_conf < self.conf_drop_threshold) or \
-                   high_overlap_count > 0: # Sensitivity tuned
-                    self.current_mode = self.MODE_2
-                    print(f"Switched to MODE 2 (Surge): Avg Conf {avg_conf:.2f}, Overlaps {high_overlap_count}")
-                    
-            elif self.current_mode == self.MODE_2:
-                # Check triggers to revert to Mode 1 (Recovery)
-                if len(detections) < self.recovery_threshold:
-                    self.current_mode = self.MODE_1
-                    print(f"Switched to MODE 1 (Tracking): Count {len(detections)}")
-                
-        heatmap = None
         count = len(detections)
+        
+        # Calculate metrics
+        avg_conf = 0.0
+        if count > 0:
+            avg_conf = np.mean([d['conf'] for d in detections])
+            
+        high_overlap_count = self._count_high_overlaps(detections)
+        
+        # --- Refined Switching Logic with Hysteresis ---
+        if self.manual_override is None:
+            # Thresholds optimized for face detection
+            CROWD_LIMIT = 25          # Force Surge if more than this
+            RECOVERY_LIMIT = 10       # Switch back if less than this (hysteresis buffer)
+            CONF_DROP_THRESH = self.conf_drop_threshold  # 0.60
+            MIN_CROWD_FOR_CHECK = 5   # Only check confidence if crowd exists
+            
+            if self.current_mode == self.MODE_1:
+                # Triggers for Surge Mode:
+                # 1. Hard crowd limit (too many people)
+                # 2. Confidence drop (faces occluded/blurry)
+                # 3. High overlap (people clumping)
+                
+                is_crowded = count > CROWD_LIMIT
+                is_uncertain = (count > MIN_CROWD_FOR_CHECK) and (avg_conf < CONF_DROP_THRESH)
+                is_clumping = high_overlap_count > 2
+                
+                if is_crowded or is_uncertain or is_clumping:
+                    self.current_mode = self.MODE_2
+                    self.flow_calculator.reset()
+                    print(f"🔄 Auto Switch -> SURGE MODE")
+                    print(f"   Count: {count}, Conf: {avg_conf:.2f}, Overlaps: {high_overlap_count}")
+                     
+            elif self.current_mode == self.MODE_2:
+                # Recovery to Tracking Mode:
+                # Must be sparse enough AND confident enough
+                # Hysteresis: 10-25 buffer zone prevents flickering
+                
+                is_sparse = count < RECOVERY_LIMIT
+                is_confident = (count == 0) or (avg_conf > (CONF_DROP_THRESH + 0.05))
+                
+                if is_sparse and is_confident:
+                    self.current_mode = self.MODE_1
+                    print(f"🔄 Auto Switch -> TRACKING MODE")
+                    print(f"   Count: {count}, Conf: {avg_conf:.2f}")
+        
+        # Generate mode-specific outputs
+        heatmap = None
         count_data = {"in_count": 0, "out_count": 0, "line": None}
+        flow_data = None
         
         if self.current_mode == self.MODE_2:
-             # Generate Heatmap
-             heatmap, density_sum = self.density_estimator.generate_heatmap(frame, detections)
+            # Generate Heatmap
+            heatmap, density_sum = self.density_estimator.generate_heatmap(frame, detections)
+            # Calculate Optical Flow
+            flow_data = self.flow_calculator.calculate_flow(frame)
         else:
-             # Mode 1: Update Counter
-             count_data = self.counter.update(detections, frame.shape)
+            # Mode 1: Update Counter
+            count_data = self.counter.update(detections, frame.shape)
                  
         return {
             "mode": self.current_mode,
             "detections": detections, 
             "count": count,
             "heatmap": heatmap,
-            "counts": count_data # New field for IN/OUT
+            "counts": count_data,
+            "flow": flow_data
         }
 
     def _count_high_overlaps(self, detections):

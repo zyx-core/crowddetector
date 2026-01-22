@@ -8,10 +8,20 @@ from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import sys
 
 from config import load_config
 from hybrid_engine import HybridEngine
 from utils import draw_text_with_background
+
+# PyInstaller resource path helper
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and PyInstaller"""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 # Initialize App
 app = FastAPI(title="Crowd Detection System API")
@@ -25,9 +35,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static Files (Frontend)
-os.makedirs("web", exist_ok=True)
-app.mount("/static", StaticFiles(directory="web"), name="static")
+# Static Files (Frontend) - use resource_path for PyInstaller
+web_dir = resource_path("web")
+os.makedirs(web_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=web_dir), name="static")
 
 # Global State
 class SystemState:
@@ -131,10 +142,13 @@ def get_video_stream():
 @app.get("/")
 async def index():
     try:
-        with open("web/index.html", "r", encoding="utf-8") as f:
+        index_path = resource_path("web/index.html")
+        with open(index_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     except Exception as e:
         print(f"Error serving index.html: {e}")
+        print(f"Tried path: {resource_path('web/index.html')}")
+        print(f"Current dir: {os.getcwd()}")
         return HTMLResponse(content=f"<h1>Error loading page: {e}</h1>", status_code=500)
 
 @app.get("/video_feed")

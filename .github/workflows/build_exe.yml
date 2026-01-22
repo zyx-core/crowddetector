@@ -1,0 +1,41 @@
+name: Build Windows Exe
+
+on:
+  workflow_dispatch:  # Allow manual trigger
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+        
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Install PyInstaller
+        pip install pyinstaller
+        # Install project dependencies
+        # Exclude tensorflow to save space/time as discussed
+        pip install -r requirements.txt
+        # Ensure we don't have heavy unused libs
+        pip uninstall -y tensorflow tensorflow-intel keras tensorboard 2>nul || ver >nul
+        
+    - name: Build Executable
+      run: |
+        # Run PyInstaller with the optimized spec file
+        pyinstaller crowdsense.spec --clean
+        
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CrowdSense-Windows
+        path: dist/CrowdSense.exe
