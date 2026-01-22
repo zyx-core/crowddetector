@@ -35,6 +35,7 @@ ENV/
 # YOLO
 runs/
 *.pt
+!best.pt
 *.onnx
 *.engine
 weights/
