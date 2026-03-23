@@ -3,6 +3,7 @@ from detector import PersonDetector
 from config import load_config
 from density_estimator import DensityEstimator
 from counter import PeopleCounter
+from optical_flow import OpticalFlowCalculator
 
 class HybridEngine:
     """
@@ -24,9 +25,16 @@ class HybridEngine:
             iou_threshold=self.config.model.iou_threshold
         )
         self.counter = PeopleCounter()
+        if hasattr(self.config.counting, 'counting_zone') and self.config.counting.counting_zone is not None:
+             self.counter.set_zone_and_edges(
+                 self.config.counting.counting_zone,
+                 getattr(self.config.counting, 'entry_edge', 'left'),
+                 getattr(self.config.counting, 'exit_edge', 'right')
+             )
         
         # Mode 2 Engine
         self.density_estimator = DensityEstimator()
+        self.flow_calculator = OpticalFlowCalculator()
         
         # Switching Logic Parameters
         self.conf_drop_threshold = 0.45
@@ -49,11 +57,20 @@ class HybridEngine:
                 self.manual_override = mode
                 self.current_mode = mode
             print(f"Manual Mode Set to: {mode}")
-
-    def update_tripwire(self, line_coords):
-        """Update the tripwire line in the counter."""
+            
+    def start_counting(self):
         if self.counter:
-            self.counter.set_line(line_coords)
+            self.counter.start_counting()
+            
+    def stop_counting(self):
+        if self.counter:
+            return self.counter.stop_counting()
+        return None
+
+    def update_zone_and_edges(self, zone_coords, entry_edge, exit_edge):
+        """Update the counting lines in the counter."""
+        if self.counter:
+            self.counter.set_zone_and_edges(zone_coords, entry_edge, exit_edge)
 
     def process_frame(self, frame):
         """
@@ -107,9 +124,10 @@ class HybridEngine:
                     print(f"🔄 Auto Switch -> TRACKING MODE")
                     print(f"   Count: {count}, Conf: {avg_conf:.2f}")
         
-        # Generate mode-specific outputs
+        # Always Update Counter to keep IN/OUT and trajectories active
+        count_data = self.counter.update(detections, frame.shape) if self.counter else {"in_count": 0, "out_count": 0, "line": None}
+        
         heatmap = None
-        count_data = {"in_count": 0, "out_count": 0, "line": None}
         flow_data = None
         
         if self.current_mode == self.MODE_2:
@@ -117,9 +135,6 @@ class HybridEngine:
             heatmap, density_sum = self.density_estimator.generate_heatmap(frame, detections)
             # Calculate Optical Flow
             flow_data = self.flow_calculator.calculate_flow(frame)
-        else:
-            # Mode 1: Update Counter
-            count_data = self.counter.update(detections, frame.shape)
                  
         return {
             "mode": self.current_mode,

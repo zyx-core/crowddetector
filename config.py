@@ -79,6 +79,9 @@ class CountingConfig:
     mode: str = "track_based"  # frame_based or track_based
     smoothing: bool = True
     smoothing_window: int = 5
+    counting_zone: Optional[list] = None
+    entry_edge: str = "left"
+    exit_edge: str = "right"
 
     def __post_init__(self):
         """Validate configuration."""

@@ -64,11 +64,14 @@ class CrowdCountingSystem:
             )
             
             # Counter
-            self.counter = PeopleCounter(
-                mode=config.counting.mode,
-                smoothing=config.counting.smoothing,
-                smoothing_window=config.counting.smoothing_window
-            )
+            self.counter = PeopleCounter()
+            
+            if hasattr(config.counting, 'counting_zone'):
+                self.counter.set_zone_and_edges(
+                    config.counting.counting_zone,
+                    getattr(config.counting, 'entry_edge', 'left'),
+                    getattr(config.counting, 'exit_edge', 'right')
+                )
             
             # Visualizer
             self.visualizer = Visualizer(
@@ -123,7 +126,8 @@ class CrowdCountingSystem:
                 
                 # Counting
                 self.profiler.start('counting')
-                count = self.counter.update(detections)
+                count_data = self.counter.update(detections, frame.shape)
+                count = count_data.get('current_count', len(detections))
                 self.profiler.end('counting')
                 
                 # Get FPS
@@ -131,7 +135,7 @@ class CrowdCountingSystem:
                 
                 # Visualization
                 self.profiler.start('visualization')
-                key = self.visualizer.show(frame, detections, count, fps)
+                key = self.visualizer.show(frame, detections, count_data, fps)
                 self.profiler.end('visualization')
                 
                 # Handle key press
@@ -149,7 +153,7 @@ class CrowdCountingSystem:
                 frame_count += 1
                 if frame_count % 100 == 0:
                     self.logger.log_performance(fps, count, detection_time)
-                    self.logger.log_detection(len(detections), len(self.counter.active_track_ids))
+                    self.logger.log_detection(len(detections), len(getattr(self.counter, 'trajectories', [])))
             
         except KeyboardInterrupt:
             self.logger.info("Interrupted by user")

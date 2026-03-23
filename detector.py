@@ -87,19 +87,22 @@ class PersonDetector:
             if track:
                 results = self.model.track(
                     frame,
-                    conf=self.confidence_threshold,
+                    conf=0.25, # Lowered confidence to pick up distant people
                     iou=self.iou_threshold,
                     classes=[self.PERSON_CLASS_ID],
                     persist=True,
-                    verbose=False
+                    tracker="botsort.yaml",
+                    verbose=False,
+                    imgsz=1088 # Increased inference resolution explicitly for 1080p 'small heads'
                 )
             else:
                 results = self.model(
                     frame,
-                    conf=self.confidence_threshold,
+                    conf=0.25, 
                     iou=self.iou_threshold,
                     classes=[self.PERSON_CLASS_ID],
-                    verbose=False
+                    verbose=False,
+                    imgsz=1088
                 )
             
             # Parse results

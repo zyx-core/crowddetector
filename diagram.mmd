@@ -1,0 +1,46 @@
+graph TD
+    %% Video Source Layer
+    subgraph Input ["Input Layer"]
+        cam["Video Source (Webcam/File)"] --> vh["VideoHandler"]
+        conf["config.yaml"] -.-> vh
+    end
+
+    %% AI Layer
+    subgraph ML ["AI & Detection Layer"]
+        vh -- "OpenCV Frame (Numpy Array)" --> pdet["PersonDetector<br/>(YOLOv8 + ByteTrack)"]
+    end
+
+    %% Counting Logic
+    subgraph Counting ["Mathematics & Counting Logic"]
+        pdet -- "Bounding Boxes + Track IDs" --> cnt["PeopleCounter"]
+        
+        cnt -- "Centroids" --> track{"PointPolygonTest"}
+        
+        track -- "OUTSIDE ➡ INSIDE" --> entry["Log Entry Point (x,y)"]
+        track -- "INSIDE ➡ OUTSIDE" --> ex["Log Exit Point (x,y)"]
+        
+        entry --> pt{"Intersect Configured Lines?"}
+        ex --> pt
+        
+        pt -- "Lines Crossed" --> metrics["Update Global Counters<br/>(IN / OUT / PASS_THROUGH)"]
+        pt -- "Did not cross lines" --> dismiss["Ignore / Dismiss"]
+    end
+
+    %% Presentation Layer
+    subgraph Presentation ["Presentation Layer"]
+        metrics -- "Count Data + Trajectory Lines" --> vis["Visualizer Rendering"]
+        
+        vis -- "Painted Frame Output" --> desktop["main.py (Desktop App)"]
+        vis -- "Painted Frame Output" --> web_backend["server.py (FastAPI)"]
+        
+        web_backend -. "MJPEG Video Stream" .-> browser["Browser (HTML/JS)"]
+        browser -. "REST updates (Update Zone)" .-> web_backend
+    end
+    
+    classDef ai fill:#3b82f6,color:#fff,stroke:#2563eb,stroke-width:2px;
+    classDef logic fill:#8b5cf6,color:#fff,stroke:#6d28d9,stroke-width:2px;
+    classDef ui fill:#10b981,color:#fff,stroke:#059669,stroke-width:2px;
+    
+    class pdet ai;
+    class track,pt,metrics logic;
+    class desktop,browser,web_backend ui;

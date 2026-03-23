@@ -1,11 +1,11 @@
 :root {
-    --primary: #6366f1;
-    --secondary: #a855f7;
-    --dark: #0f172a;
-    --light: #f8fafc;
-    --glass-bg: rgba(30, 41, 59, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --neon-blue: #00f3ff;
+    --primary: #ffffff;
+    --secondary: #a0a0a0;
+    --dark: #050505;
+    --light: #f5f5f5;
+    --glass-bg: rgba(20, 20, 20, 0.75);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --neon-blue: #ffffff;
 }
 
 * {
@@ -18,18 +18,19 @@
 body {
     background-color: var(--dark);
     background-image: 
-        radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.2) 0%, transparent 40%),
-        radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.2) 0%, transparent 40%);
+        radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(255, 255, 255, 0.02) 0%, transparent 40%);
     color: var(--light);
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .container {
     max-width: 1400px;
     margin: 0 auto;
     padding: 2rem;
-    height: 100%;
+    min-height: 100%;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -85,7 +86,7 @@ main {
     display: grid;
     grid-template-columns: 350px 1fr;
     gap: 2rem;
-    height: calc(100% - 100px);
+    min-height: calc(100vh - 100px);
 }
 
 .glass-panel {
@@ -125,8 +126,9 @@ main {
 
 .tab-btn.active {
     background: var(--primary);
-    color: white;
-    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    color: black;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.15);
 }
 
 .tab-content {
@@ -160,7 +162,7 @@ main {
 .upload-zone:hover {
     border-color: var(--primary);
     color: var(--primary);
-    background: rgba(99, 102, 241, 0.05);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .upload-zone i {
@@ -171,22 +173,24 @@ main {
 .action-btn {
     width: 100%;
     padding: 1rem;
-    border: none;
+    border: 1px solid rgba(255,255,255,0.2);
     border-radius: 1rem;
     font-size: 1.1rem;
     font-weight: 600;
     cursor: pointer;
     transition: transform 0.2s;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    background: linear-gradient(135deg, #2a2a2a, #0a0a0a);
     color: white;
 }
 
 .action-btn:hover {
     transform: scale(1.02);
+    background: linear-gradient(135deg, #3a3a3a, #1a1a1a);
 }
 
 .action-btn.glow {
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+    border-color: rgba(255,255,255,0.4);
 }
 
 /* Display Area */
@@ -229,11 +233,11 @@ main {
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 2rem;
-    padding: 1rem 2rem;
+    gap: 1.5rem;
+    padding: 0.5rem 1.5rem;
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(8px);
-    border-radius: 2rem;
+    border-radius: 1.5rem;
     border: 1px solid rgba(255,255,255,0.1);
 }
 
@@ -244,14 +248,14 @@ main {
 }
 
 .stat-item .label {
-    font-size: 0.8rem;
+    font-size: 0.65rem;
     text-transform: uppercase;
     color: #94a3b8;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
 }
 
 .stat-item .value {
-    font-size: 1.8rem;
+    font-size: 1.2rem;
     font-weight: 700;
     color: var(--neon-blue);
 }

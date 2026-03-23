@@ -9,6 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import sys
+import json
+from datetime import datetime
 
 from config import load_config
 from hybrid_engine import HybridEngine
@@ -78,13 +80,33 @@ def get_video_stream():
         heatmap = result.get('heatmap')
         count_data = result.get('counts', {})
         
-        # Mode 1: Draw Boxes + Tripwire
+        # Mode 1: Draw Boxes + Zone
         if mode == HybridEngine.MODE_1:
-            # Draw Tripwire
-            line = count_data.get('line')
-            if line:
-                cv2.line(vis_frame, line[0], line[1], (255, 0, 0), 2)
+            # Draw Polygon Zone
+            zone_coords = count_data.get('zone', None)
+            if zone_coords:
+                pts = np.array(zone_coords, np.int32)
+                pts = pts.reshape((-1, 1, 2))
+                overlay = vis_frame.copy()
+                cv2.fillPoly(overlay, [pts], (255, 0, 0))
+                cv2.addWeighted(overlay, 0.2, vis_frame, 0.8, 0, vis_frame)
+                cv2.polylines(vis_frame, [pts], isClosed=True, color=(255, 0, 0), thickness=2)
                 
+            # Draw Entry Line and Exit Line
+            entry_line = count_data.get('entry_line', None)
+            exit_line = count_data.get('exit_line', None)
+            
+            if entry_line and len(entry_line) == 2:
+                cv2.line(vis_frame, tuple(entry_line[0]), tuple(entry_line[1]), (0, 255, 0), 3)
+                cv2.putText(vis_frame, "ENTRY", tuple(entry_line[0]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                
+            if exit_line and len(exit_line) == 2:
+                cv2.line(vis_frame, tuple(exit_line[0]), tuple(exit_line[1]), (0, 0, 255), 3)
+                cv2.putText(vis_frame, "EXIT", tuple(exit_line[0]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                
+            # Removed visually messy trajectory spiderwebs to keep the display clean.
+            # Tracking IDs will still be maintained internally for count logic.
+            # We just draw the entry/exit tripwires and individual bounding boxes.
             for det in detections:
                 bbox = det['bbox']
                 x1, y1, x2, y2 = map(int, bbox)
@@ -97,10 +119,12 @@ def get_video_stream():
                 cv2.rectangle(vis_frame, (x1, y1), (x2, y2), color, 2)
                 
             # Draw IN/OUT
+            in_room_c = count_data.get('in_room_count', 0)
             in_c = count_data.get('in_count', 0)
             out_c = count_data.get('out_count', 0)
-            draw_text_with_background(vis_frame, f"IN: {in_c}", 20, 100, text_color=(0, 255, 0))
-            draw_text_with_background(vis_frame, f"OUT: {out_c}", 20, 130, text_color=(0, 0, 255))
+            draw_text_with_background(vis_frame, f"IN ROOM: {in_room_c}", 20, 100, text_color=(0, 255, 255), bg_color=(0, 0, 0))
+            draw_text_with_background(vis_frame, f"IN: {in_c}", 20, 130, text_color=(0, 255, 0), bg_color=(0, 0, 0))
+            draw_text_with_background(vis_frame, f"OUT: {out_c}", 20, 160, text_color=(0, 0, 255), bg_color=(0, 0, 0))
                 
         # Mode 2: Draw Heatmap Overlay + Optical Flow
         elif mode == HybridEngine.MODE_2 and heatmap is not None:
@@ -158,10 +182,11 @@ async def video_feed():
 @app.get("/stats")
 async def get_stats():
     stats = state.latest_stats.copy()
-    # Add IN/OUT counts if available
+    # Add IN/OUT/ROOM counts if available
     if state.engine.counter:
         stats["in_count"] = state.engine.counter.in_count
         stats["out_count"] = state.engine.counter.out_count
+        stats["in_room_count"] = state.engine.counter.in_room_count
     return JSONResponse(stats)
 
 @app.post("/start_webcam")
@@ -172,8 +197,11 @@ async def start_webcam():
     state.camera = cv2.VideoCapture(0)
     state.source_type = 'webcam'
     state.is_running = True
-    state.is_running = True
-    # state.counter.reset() # Legacy, removed
+    
+    # Auto-start counter on stream begin
+    state.engine.start_counting()
+    state.session_start = datetime.now()
+    
     return {"status": "Webcam started"}
 
 @app.post("/stop")
@@ -196,20 +224,74 @@ async def upload_video(file: UploadFile = File(...)):
     state.camera = cv2.VideoCapture(temp_file)
     state.source_type = 'video'
     state.is_running = True
-    state.is_running = True
-    # state.counter.reset()
+    
+    # Auto-start counter on stream begin
+    state.engine.start_counting()
+    state.session_start = datetime.now()
     
     return {"status": "Video uploaded and started"}
 
 
+HISTORY_FILE = "history.json"
+
+@app.post("/start_counting")
+async def start_counting():
+    state.engine.start_counting()
+    state.session_start = datetime.now()
+    return {"status": "Counting started"}
+
+@app.post("/finish_counting")
+async def finish_counting():
+    stats = state.engine.stop_counting()
+    if not stats:
+        return {"status": "No active counter"}
+        
+    session_end = datetime.now()
+    duration = str(session_end - getattr(state, 'session_start', session_end)).split('.')[0] # HH:MM:SS
+    
+    record = {
+        "date": session_end.strftime("%Y-%m-%d %H:%M:%S"),
+        "duration": duration,
+        "in_count": stats.get("in_count", 0),
+        "out_count": stats.get("out_count", 0),
+        "in_room_end": stats.get("in_room_count", 0)
+    }
+    
+    try:
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, "r") as f:
+                history = json.load(f)
+        else:
+            history = []
+    except Exception:
+        history = []
+        
+    history.append(record)
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(history, f)
+        
+    return {"status": "Counting finished", "record": record}
+
+@app.get("/history")
+async def get_history():
+    try:
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, "r") as f:
+                history = json.load(f)
+            return JSONResponse(history)
+    except Exception:
+        pass
+    return JSONResponse([])
         
 from pydantic import BaseModel
 
 class ToggleModeRequest(BaseModel):
     mode: str
 
-class LineUpdateRequest(BaseModel):
-    line: list # [[x1, y1], [x2, y2]]
+class ZoneUpdateRequest(BaseModel):
+    zone: list # [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
+    entry_edge: str
+    exit_edge: str
 
 @app.post("/toggle_mode")
 async def toggle_mode(data: ToggleModeRequest):
@@ -219,15 +301,14 @@ async def toggle_mode(data: ToggleModeRequest):
         return {"status": "success", "mode": mode}
     return JSONResponse(status_code=400, content={"message": "Mode required"})
 
-@app.post("/update_line")
-async def update_line(data: LineUpdateRequest):
-    line = data.line
-    if line and len(line) == 2:
-        # Convert to list of tuples
-        line_coords = [(int(line[0][0]), int(line[0][1])), (int(line[1][0]), int(line[1][1]))]
-        state.engine.update_tripwire(line_coords)
-        return {"status": "success", "line": line_coords}
-    return JSONResponse(status_code=400, content={"message": "Invalid line data"})
+@app.post("/update_zone")
+async def update_zone(data: ZoneUpdateRequest):
+    zone = data.zone
+    if zone and len(zone) >= 3:
+        zone_coords = [(int(p[0]), int(p[1])) for p in zone]
+        state.engine.update_zone_and_edges(zone_coords, data.entry_edge, data.exit_edge)
+        return {"status": "success", "zone": zone_coords}
+    return JSONResponse(status_code=400, content={"message": "Invalid zone data"})
 
 @app.get("/export_csv")
 async def export_csv():
@@ -250,6 +331,7 @@ async def export_csv():
     if state.engine.counter:
         writer.writerow([now, 'IN_COUNT', state.engine.counter.in_count])
         writer.writerow([now, 'OUT_COUNT', state.engine.counter.out_count])
+        writer.writerow([now, 'IN_ROOM_COUNT', state.engine.counter.in_room_count])
         writer.writerow([now, 'TOTAL_COUNT', state.engine.counter.total_count])
     
     output.seek(0)

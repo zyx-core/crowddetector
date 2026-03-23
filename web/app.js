@@ -33,15 +33,20 @@ function startStatsPolling() {
         try {
             const res = await fetch(`${API_URL}/stats`);
             const data = await res.json();
-            updateStats(data.count);
+            updateStats(data);
         } catch (e) {
             console.error(e);
         }
     }, 500);
 }
 
-function updateStats(count) {
+function updateStats(stats) {
+    const count = stats.count || 0;
+    const inRoom = stats.in_room_count || 0;
+    
     document.getElementById('count-value').innerText = count;
+    const inRoomEl = document.getElementById('in-room-value');
+    if(inRoomEl) inRoomEl.innerText = inRoom;
 
     const densityEl = document.getElementById('density-value');
     if (count < 10) {
@@ -160,7 +165,7 @@ imageInput.addEventListener('change', async (e) => {
             resultImg.src = data.image;
             resultImg.style.display = 'block';
             document.getElementById('placeholder-view').style.display = 'none';
-            updateStats(data.count);
+            updateStats(data);
 
             imageDropZone.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i><p>Drag & Drop or Click to Upload Image</p>';
         } else {
@@ -171,21 +176,26 @@ imageInput.addEventListener('change', async (e) => {
     }
 });
 
-// --- Tripwire Editor ---
-const canvas = document.getElementById('tripwire-canvas');
+// --- Zone Editor ---
+const canvas = document.getElementById('tripwire-canvas'); // keeping ID to avoid changing index.html fully
 const ctx = canvas.getContext('2d');
 let isEditing = false;
 let isDragging = false;
-let selectedHandle = -1; // 0 for start, 1 for end
-let lineCoords = [{ x: 0, y: 0.6 }, { x: 1, y: 0.6 }]; // Normalized coordinates (0-1)
+let selectedHandle = -1; // 0-3 for corners
+let zoneCoords = [
+    { x: 0.2, y: 0.2 }, 
+    { x: 0.8, y: 0.2 }, 
+    { x: 0.8, y: 0.8 }, 
+    { x: 0.2, y: 0.8 }
+]; // Normalized coordinates (0-1)
 
-function initTripwireEditor() {
+function initZoneEditor() {
     const resizeCanvas = () => {
         const container = document.querySelector('.view-container');
         if (container) {
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
-            drawTripwire();
+            drawZone();
         }
     };
     window.addEventListener('resize', resizeCanvas);
@@ -197,31 +207,30 @@ function initTripwireEditor() {
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        const p1 = { x: lineCoords[0].x * canvas.width, y: lineCoords[0].y * canvas.height };
-        const p2 = { x: lineCoords[1].x * canvas.width, y: lineCoords[1].y * canvas.height };
-
-        if (dist(mouseX, mouseY, p1.x, p1.y) < 20) {
-            isDragging = true;
-            selectedHandle = 0;
-        } else if (dist(mouseX, mouseY, p2.x, p2.y) < 20) {
-            isDragging = true;
-            selectedHandle = 1;
+        for (let i = 0; i < 4; i++) {
+            const px = zoneCoords[i].x * canvas.width;
+            const py = zoneCoords[i].y * canvas.height;
+            if (dist(mouseX, mouseY, px, py) < 20) {
+                isDragging = true;
+                selectedHandle = i;
+                break;
+            }
         }
     });
 
     canvas.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
         const rect = canvas.getBoundingClientRect();
-        lineCoords[selectedHandle].x = Math.max(0, Math.min(1, (e.clientX - rect.left) / canvas.width));
-        lineCoords[selectedHandle].y = Math.max(0, Math.min(1, (e.clientY - rect.top) / canvas.height));
-        drawTripwire();
+        zoneCoords[selectedHandle].x = Math.max(0, Math.min(1, (e.clientX - rect.left) / canvas.width));
+        zoneCoords[selectedHandle].y = Math.max(0, Math.min(1, (e.clientY - rect.top) / canvas.height));
+        drawZone();
     });
 
     canvas.addEventListener('mouseup', () => {
         if (isDragging) {
             isDragging = false;
             selectedHandle = -1;
-            updateLineOnServer();
+            updateZoneOnServer();
         }
     });
 }
@@ -230,65 +239,74 @@ function dist(x1, y1, x2, y2) {
     return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
 }
 
-function drawTripwire() {
+function drawZone() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!isEditing) return;
 
-    const p1 = { x: lineCoords[0].x * canvas.width, y: lineCoords[0].y * canvas.height };
-    const p2 = { x: lineCoords[1].x * canvas.width, y: lineCoords[1].y * canvas.height };
-
     ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
+    ctx.moveTo(zoneCoords[0].x * canvas.width, zoneCoords[0].y * canvas.height);
+    for (let i = 1; i < 4; i++) {
+        ctx.lineTo(zoneCoords[i].x * canvas.width, zoneCoords[i].y * canvas.height);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+    ctx.fill();
     ctx.strokeStyle = '#00ffff';
     ctx.lineWidth = 3;
     ctx.stroke();
 
     ctx.fillStyle = '#ff00ff';
-    ctx.beginPath();
-    ctx.arc(p1.x, p1.y, 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(p2.x, p2.y, 8, 0, Math.PI * 2);
-    ctx.fill();
-}
-
-async function updateLineOnServer() {
-    const W = 640;
-    const H = 480;
-    const serverLine = [
-        [lineCoords[0].x * W, lineCoords[0].y * H],
-        [lineCoords[1].x * W, lineCoords[1].y * H]
-    ];
-    try {
-        await fetch(`${API_URL}/update_line`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ line: serverLine })
-        });
-    } catch (e) {
-        console.error("Failed to update tripwire", e);
+    for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.arc(zoneCoords[i].x * canvas.width, zoneCoords[i].y * canvas.height, 8, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 
-document.getElementById('edit-tripwire-btn').addEventListener('click', () => {
+async function updateZoneOnServer() {
+    const W = 640;
+    const H = 480;
+    const serverZone = zoneCoords.map(p => [p.x * W, p.y * H]);
+    const entryEdge = document.getElementById('entry-edge-select').value;
+    const exitEdge = document.getElementById('exit-edge-select').value;
+    
+    try {
+        await fetch(`${API_URL}/update_zone`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ zone: serverZone, entry_edge: entryEdge, exit_edge: exitEdge })
+        });
+    } catch (e) {
+        console.error("Failed to update zone", e);
+    }
+}
+
+document.getElementById('entry-edge-select').addEventListener('change', () => {
+    updateZoneOnServer();
+});
+document.getElementById('exit-edge-select').addEventListener('change', () => {
+    updateZoneOnServer();
+});
+
+document.getElementById('edit-zone-btn').addEventListener('click', () => {
     isEditing = !isEditing;
-    const btn = document.getElementById('edit-tripwire-btn');
+    const btn = document.getElementById('edit-zone-btn');
     const cvs = document.getElementById('tripwire-canvas');
 
     if (isEditing) {
         btn.style.background = '#eab308';
         btn.innerHTML = '<i class="fa-solid fa-check"></i> Done';
         cvs.style.pointerEvents = 'auto';
-        drawTripwire();
+        drawZone();
     } else {
         btn.style.background = 'rgba(0,0,0,0.3)';
-        btn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Edit Line';
+        btn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Edit Zone';
         cvs.style.pointerEvents = 'none';
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 });
 
+initZoneEditor();
 // CSV Export
 document.getElementById('export-btn').addEventListener('click', async () => {
     try {
@@ -320,7 +338,7 @@ const chartData = {
     labels: [],
     datasets: [
         {
-            label: 'Total Count',
+            label: 'In Room',
             data: [],
             borderColor: '#3b82f6',
             backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -382,7 +400,7 @@ setInterval(async () => {
 
             // Add new data point
             chartData.labels.push(now);
-            chartData.datasets[0].data.push(stats.count || 0);
+            chartData.datasets[0].data.push(stats.in_room_count || 0);
             chartData.datasets[1].data.push(stats.in_count || 0);
             chartData.datasets[2].data.push(stats.out_count || 0);
 
@@ -398,4 +416,52 @@ setInterval(async () => {
         console.error("Chart update error:", e);
     }
 }, 1000);
+
+// Session History Logic
+const startBtn = document.getElementById('start-count-btn');
+const finishBtn = document.getElementById('finish-count-btn');
+
+startBtn.addEventListener('click', async () => {
+    try {
+        await fetch(`${API_URL}/start_counting`, { method: 'POST' });
+        startBtn.style.boxShadow = "0 0 10px #22c55e";
+        setTimeout(() => startBtn.style.boxShadow = "none", 1000);
+    } catch(e) { console.error("Start count error:", e); }
+});
+
+finishBtn.addEventListener('click', async () => {
+    try {
+        await fetch(`${API_URL}/finish_counting`, { method: 'POST' });
+        finishBtn.style.boxShadow = "0 0 10px #ef4444";
+        setTimeout(() => finishBtn.style.boxShadow = "none", 1000);
+        loadHistory();
+    } catch(e) { console.error("Finish count error:", e); }
+});
+
+async function loadHistory() {
+    try {
+        const res = await fetch(`${API_URL}/history`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const tbody = document.getElementById('history-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        data.reverse().forEach(record => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1);">${record.date}</td>
+                <td style="padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1);">${record.duration}</td>
+                <td style="padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #22c55e;">${record.in_count}</td>
+                <td style="padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #ef4444;">${record.out_count}</td>
+                <td style="padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #00ffff;">${record.in_room_end}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch(e) {
+        console.error("Failed to load history", e);
+    }
+}
+
+// Load history on initial mount
+loadHistory();
 

@@ -25,13 +25,31 @@
                 <p id="density-value" class="value">Low</p>
             </div>
             <div class="stat-item">
-                <button id="edit-tripwire-btn" class="secondary-btn"
+                <button id="edit-zone-btn" class="secondary-btn"
                     style="padding: 5px; font-size: 0.8rem; background: rgba(0,0,0,0.3); margin-right: 5px;">
-                    <i class="fa-solid fa-pen-to-square"></i> Edit Line
+                    <i class="fa-solid fa-pen-to-square"></i> Edit Zone
                 </button>
+                <select id="entry-edge-select" class="secondary-btn" style="padding: 5px; font-size: 0.8rem; background: rgba(0,255,0,0.2); color: white; border: 1px solid rgba(255,255,255,0.2); margin-right: 5px;">
+                    <option value="left">Entry: Left</option>
+                    <option value="right">Entry: Right</option>
+                    <option value="top">Entry: Top</option>
+                    <option value="bottom">Entry: Bottom</option>
+                </select>
+                <select id="exit-edge-select" class="secondary-btn" style="padding: 5px; font-size: 0.8rem; background: rgba(255,0,0,0.2); color: white; border: 1px solid rgba(255,255,255,0.2); margin-right: 5px;">
+                    <option value="right" selected>Exit: Right</option>
+                    <option value="left">Exit: Left</option>
+                    <option value="top">Exit: Top</option>
+                    <option value="bottom">Exit: Bottom</option>
+                </select>
                 <button id="export-btn" class="secondary-btn"
                     style="padding: 5px; font-size: 0.8rem; background: rgba(0,255,100,0.2); margin-right: 5px;">
                     <i class="fa-solid fa-file-csv"></i> Export CSV
+                </button>
+                <button id="start-count-btn" class="action-btn glow" style="padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; background: rgba(0, 255, 100, 0.2); color: white; border: 1px solid rgba(0,255,100,0.5); margin-right: 5px; cursor: pointer;">
+                    <i class="fa-solid fa-play"></i> Start Count
+                </button>
+                <button id="finish-count-btn" class="action-btn" style="padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; background: rgba(255, 0, 0, 0.2); color: white; border: 1px solid rgba(255,0,0,0.5); margin-right: 5px; cursor: pointer;">
+                    <i class="fa-solid fa-stop"></i> Finish & Save
                 </button>
                 <select id="mode-select" class="secondary-btn"
                     style="padding: 5px; font-size: 0.8rem; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);">
@@ -102,6 +120,10 @@
                 <!-- Stats Overlay -->
                 <div class="stats-panel">
                     <div class="stat-item">
+                        <span class="label">People In Room</span>
+                        <span class="value" id="in-room-value">0</span>
+                    </div>
+                    <div class="stat-item">
                         <span class="label">People Count</span>
                         <span class="value" id="count-value">0</span>
                     </div>
@@ -109,6 +131,27 @@
                         <span class="label">Density</span>
                         <span class="value" id="density-value">Low</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Session History -->
+            <div class="glass-panel" style="margin-top: 20px; padding: 20px;">
+                <h3 style="margin: 0 0 15px 0; color: #fff; font-size: 1rem;"><i class="fa-solid fa-clock-rotate-left"></i> Session History</h3>
+                <div style="max-height: 180px; overflow-y: auto;">
+                    <table style="width: 100%; color: white; text-align: left; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead style="position: sticky; top: 0; background: rgba(15,23,42,0.9);">
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+                                <th style="padding: 5px;">Date</th>
+                                <th style="padding: 5px;">Duration</th>
+                                <th style="padding: 5px;">Total IN</th>
+                                <th style="padding: 5px;">Total OUT</th>
+                                <th style="padding: 5px;">Max In Room</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-tbody">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

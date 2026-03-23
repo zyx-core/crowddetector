@@ -2,7 +2,7 @@
 
 # Model Settings
 model:
-  variant: "best.pt"  # Custom WIDER FACE model
+  variant: "yolov8m.pt"  # Standard YOLOv8 Person Detection
   confidence_threshold: 0.4  # Base threshold
   device: "auto"  # Options: auto, cpu, cuda, 0, 1, etc.
   iou_threshold: 0.45
@@ -54,6 +54,9 @@ counting:
   mode: "track_based"  # Options: frame_based, track_based
   smoothing: true
   smoothing_window: 5
+  counting_zone: [[150, 100], [490, 100], [490, 380], [150, 380]] # Counting ROI Polygon
+  entry_edge: "left"
+  exit_edge: "right"
 
 # Performance Settings
 performance:

@@ -1,0 +1,25 @@
+name: crowd_counting_app
+description: A new Flutter project for offline crowd counting using YOLOv8.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_vision: ^1.1.4
+  camera: ^0.10.5+9
+  permission_handler: ^11.3.0
+  image_picker: ^1.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/best_int8.tflite
